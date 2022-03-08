@@ -1,0 +1,97 @@
+name: 'terraform ci'
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        type: string
+        required: true
+    secrets:
+      github-token:
+        required: true
+      gcp-project-id:
+        required: true
+      workload-identity-provider:
+        required: true
+      service-account:
+        required: true
+
+env:
+  TERRAFORM_VERSION: 1.1.6
+
+jobs:
+  terraform-ci:
+    name: terraform-ci
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    permissions:
+      pull-requests: write
+      id-token: write
+      contents: read
+    steps:
+      - name: clone repository
+        uses: actions/checkout@v2
+
+      - name: authenticate to google cloud
+        uses: google-github-actions/auth@v0
+        with:
+          create_credentials_file: true
+          workload_identity_provider: ${{ secrets.workload-identity-provider }}
+          service_account: ${{ secrets.service-account }}
+
+      - name: setup terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: terraform fmt
+        id: fmt
+        run: terraform fmt
+
+      - name: terraform init
+        run: terraform init -reconfigure
+
+      - name: tflint
+        uses: reviewdog/action-tflint@master
+        with:
+          github_token: ${{ secrets.github-token }}
+          reporter: github-pr-review
+          level: warning
+          fail_on_error: true
+          tflint_rulesets: google
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: terraform plan
+        id: plan
+        run: |
+          cp $GOOGLE_APPLICATION_CREDENTIALS $GITHUB_WORKSPACE/terraform/credential.json
+          terraform plan -no-color -var 'gcp_project_id=${{ secrets.gcp-project-id }}'
+
+      - name: comment
+        uses: actions/github-script@v6
+        env:
+          PLAN: "terraform\n${{ steps.plan.outputs.stdout }}"
+        with:
+          github-token: ${{ secrets.github-token }}
+          script: |
+            const output = `## Work Directory: \`${{ inputs.working-directory }}\`
+            #### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`${process.env.PLAN}\`\`\`
+
+            </details>`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })

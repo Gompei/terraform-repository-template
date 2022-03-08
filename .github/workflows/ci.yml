@@ -1,0 +1,16 @@
+name: ci
+
+on:
+  pull_request:
+
+jobs:
+  ci:
+    name: ci
+    uses: Gompei/terraform-repository-template/.github/workflows/template-ci.yml@main
+    with:
+      working-directory: terraform
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      gcp-project-id: ${{ secrets.GCP_PROJECT_ID }}
+      workload-identity-provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      service-account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
