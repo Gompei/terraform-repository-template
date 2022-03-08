@@ -61,7 +61,7 @@ jobs:
         id: apply
         run: |
           cp $GOOGLE_APPLICATION_CREDENTIALS $GITHUB_WORKSPACE/terraform/credential.json
-          terraform apply -auto-approve -var 'gcp_project_id=${{ secrets.gcp-project-id }}'
+          terraform apply -no-color -auto-approve -var 'gcp_project_id=${{ secrets.gcp-project-id }}'
 
       - name: comment
         uses: actions/github-script@v6
@@ -72,7 +72,7 @@ jobs:
           script: |
             const output = `## Work Directory: \`${{ inputs.working-directory }}\`
             #### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
-            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+            #### Terraform Apply 📖\`${{ steps.apply.outcome }}\`
 
             <details><summary>Show Apply Result</summary>
 
